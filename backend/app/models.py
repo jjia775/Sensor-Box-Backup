@@ -1,20 +1,23 @@
 import uuid
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-from sqlalchemy import Integer, String, JSON, ForeignKey, DateTime, func
-from sqlalchemy import String, Boolean, TIMESTAMP, text, ForeignKey, Float, BigInteger, Index, Integer
+from sqlalchemy import Integer, String, Boolean, TIMESTAMP, text, ForeignKey, Float, BigInteger, Index, DateTime, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 class Base(DeclarativeBase):
     pass
 
-class User(Base):
-    __tablename__ = "users"
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
-    password_hash: Mapped[str] = mapped_column(String(255))
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[str] = mapped_column(TIMESTAMP(timezone=True), server_default=text("CURRENT_TIMESTAMP"))
-    sensors = relationship("Sensor", back_populates="owner")
+class Household(Base):
+    __tablename__ = "households"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    serial_number: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    householder: Mapped[str] = mapped_column(String(128), nullable=False)
+    phone: Mapped[str] = mapped_column(String(32), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
+    address: Mapped[str] = mapped_column(String(255), nullable=False)
+    zone: Mapped[str] = mapped_column(String(1), nullable=False)
+    house_id: Mapped[str] = mapped_column(String(16), unique=True, index=True, nullable=False)
+    created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    sensors: Mapped[list["Sensor"]] = relationship("Sensor", back_populates="household", cascade="all, delete-orphan", passive_deletes=True)
 
 class Sensor(Base):
     __tablename__ = "sensors"
@@ -22,11 +25,12 @@ class Sensor(Base):
     name: Mapped[str] = mapped_column(String(120), index=True)
     type: Mapped[str] = mapped_column(String(80), index=True)
     location: Mapped[str | None] = mapped_column(String(120), nullable=True)
-    owner_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    serial_number: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)  # 新增
+    owner_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("households.id", ondelete="SET NULL"), index=True, nullable=True)
     meta: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    owner = relationship("User", back_populates="sensors")
-    readings = relationship("SensorReading", back_populates="sensor", cascade="all, delete-orphan")
-    configs = relationship("SensorConfig", back_populates="sensor", cascade="all, delete-orphan")
+    household: Mapped["Household"] = relationship("Household", back_populates="sensors")
+    readings = relationship("SensorReading", back_populates="sensor", cascade="all, delete-orphan", passive_deletes=True)
+    configs = relationship("SensorConfig", back_populates="sensor", cascade="all, delete-orphan", passive_deletes=True)
 
 class SensorReading(Base):
     __tablename__ = "sensor_readings"

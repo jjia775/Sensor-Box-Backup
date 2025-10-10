@@ -1,63 +1,79 @@
 import uuid
-from typing import Optional, Any
-from pydantic import BaseModel, EmailStr, Field
-
-
-class UserCreate(BaseModel):
-    email: EmailStr
-    password: str
-
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-
-
-class UserOut(BaseModel):
-    id: uuid.UUID
-    email: EmailStr
-
-class Config:
-    from_attributes = True
-
+from typing import Optional, Any, Literal
+from pydantic import BaseModel, EmailStr, Field, AliasChoices, ConfigDict
 
 class SensorCreate(BaseModel):
     name: str
-    type: str
+    type: str = Field(validation_alias=AliasChoices("type", "sensor_type"))
     location: Optional[str] = None
-    metadata: Optional[dict] = None
+    serial_number: Optional[str] = Field(default=None, validation_alias=AliasChoices("serial_number", "serial", "sn"))
+    metadata: Optional[dict[str, Any]] = Field(default=None, validation_alias=AliasChoices("metadata", "meta"))
 
+
+
+class SensorUpdate(BaseModel):
+    name: Optional[str] = None
+    type: Optional[str] = Field(default=None, validation_alias=AliasChoices("type", "sensor_type"))
+    location: Optional[str] = None
+    is_active: Optional[bool] = None
+    metadata: Optional[dict[str, Any]] = Field(default=None, validation_alias=AliasChoices("metadata", "meta"))
 
 class SensorOut(BaseModel):
     id: uuid.UUID
     name: str
     type: str
     location: Optional[str] = None
-    metadata: Optional[dict] = None
+    serial_number: Optional[str] = None   # ← 新增
+    meta: Optional[dict] = None
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ConfigCreate(BaseModel):
-    value: dict
-    is_active: Optional[bool] = True
-
+    data: dict
+    revision: Optional[int] = None
 
 class ConfigOut(BaseModel):
-    id: uuid.UUID
+    id: int
     sensor_id: uuid.UUID
-    version: int
-    value: dict
-    is_active: bool
-
+    revision: int
+    data: dict
+    created_at: str
+    model_config = ConfigDict(from_attributes=True)
 
 class ReadingCreate(BaseModel):
-    data: dict
+    sensor_id: uuid.UUID
+    value: float
+    attributes: Optional[dict[str, Any]] = None
     ts: Optional[str] = None
-    config_version: Optional[int] = None
-
 
 class ReadingOut(BaseModel):
-    id: uuid.UUID
+    id: int
     sensor_id: uuid.UUID
     ts: Any
-    data: dict
-    config_version: Optional[int] = None
+    value: float
+    attributes: Optional[dict[str, Any]] = None
+    model_config = ConfigDict(from_attributes=True)
+
+class RegisterIn(BaseModel):
+    serial_number: str = Field(min_length=1, pattern=r"^\d+$")
+    householder: str = Field(min_length=1)
+    phone: str = Field(min_length=3)
+    email: EmailStr
+    address: str = Field(min_length=1)
+    zone: Literal["N", "S", "W", "E", "C"]
+
+class RegisterOut(BaseModel):
+    house_id: str
+
+class LoginRequest(BaseModel):
+    house_id: str
+
+class HouseholdOut(BaseModel):
+    id: int
+    house_id: str
+    householder: str
+    phone: str
+    email: EmailStr
+    address: str
+    zone: str
+    model_config = ConfigDict(from_attributes=True)
